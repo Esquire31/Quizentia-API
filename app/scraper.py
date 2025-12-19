@@ -35,4 +35,5 @@ def scrape_article(url: str) -> dict:
     return {
         "title": title,
         "content": content,
+        "full_text": "\n".join(content)
     }
