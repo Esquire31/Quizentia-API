@@ -1,4 +1,5 @@
-# Quizentia 🚀  
+# Quizentia API 🚀
+
 **Turn any article into engaging quizzes — instantly.**
 
 ![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
@@ -11,31 +12,35 @@
 
 ## 🧠 About Quizentia
 
-**Quizentia** is an AI-powered API platform that transforms any publicly accessible article into structured, high-quality quizzes.  
-Designed to be content-agnostic, Quizentia works across domains — news, education, research, blogs, and more.
+**Quizentia** is an AI-powered API that converts **any publicly accessible article** into a structured, interactive quiz.
 
-From scraping article content to generating intelligent quiz questions, Quizentia acts as a **one-stop backend engine** for quiz-based learning experiences.
+It handles the entire pipeline:
+**scraping → cleaning → understanding → quiz generation**, making it a one-stop backend engine for quiz-based products, learning platforms, and content engagement tools.
+
+Quizentia is **domain-agnostic** — it works for news, blogs, education, research, tech, law, finance, and more.
 
 ---
 
 ## ✨ Key Features
 
-- 🌐 Scrape and parse articles from public websites  
-- 🧹 Clean and structure article content automatically  
-- 🤖 Generate quizzes using AI (GPT-powered)  
-- 🧩 Domain-agnostic — works for *any* topic  
-- ⚡ Built with FastAPI for speed and scalability  
-- 📦 JSON-first responses for easy integration  
+* 🌐 Scrape articles from public websites
+* 🧹 Clean & extract meaningful article text
+* 🤖 Generate **10 AI-powered MCQs** per article
+* 💡 Each question includes a **hint**
+* 🧩 Topic-agnostic (not limited to any domain)
+* ⚡ Built with FastAPI for performance
+* 🔓 CORS-enabled for frontend integrations
+* 📦 JSON-first, frontend-friendly API responses
 
 ---
 
 ## 🏗️ Tech Stack
 
-- **Backend:** FastAPI (Python)
-- **Scraping:** Requests + BeautifulSoup
-- **AI:** OpenAI GPT (mini / configurable)
-- **Parsing:** lxml
-- **API Docs:** Swagger (auto-generated)
+* **Backend:** FastAPI (Python)
+* **Scraping:** Requests + BeautifulSoup
+* **AI:** OpenAI GPT (Mini / configurable)
+* **Validation:** Pydantic
+* **API Docs:** Swagger UI (auto-generated)
 
 ---
 
@@ -45,15 +50,15 @@ From scraping article content to generating intelligent quiz questions, Quizenti
 quizentia/
 │
 ├── app/
-│   ├── main.py          # FastAPI entry point
-│   ├── scraper.py       # Article scraping logic
-│   ├── schemas.py       # Pydantic models
+│   ├── main.py              # FastAPI entry point + CORS
+│   ├── scraper.py           # Article scraping logic
+│   ├── schemas.py           # Pydantic request/response models
 │   └── services/
-│       └── quiz_gen.py  # AI quiz generation
+│       └── quiz_generator.py # OpenAI quiz generation logic
 │
 ├── requirements.txt
 └── README.md
-````
+```
 
 ---
 
@@ -66,7 +71,7 @@ git clone https://github.com/your-username/quizentia.git
 cd quizentia
 ```
 
-### 2️⃣ Setup Virtual Environment
+### 2️⃣ Create & Activate Virtual Environment
 
 ```bash
 python -m venv venv
@@ -79,35 +84,87 @@ source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 4️⃣ Run the API
+### 4️⃣ Set Environment Variables
+
+```bash
+export OPENAI_API_KEY=your_api_key_here
+```
+
+(Windows PowerShell)
+
+```powershell
+setx OPENAI_API_KEY "your_api_key_here"
+```
+
+---
+
+### 5️⃣ Run the API
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-Open API docs at:
-👉 `http://127.0.0.1:8000/docs`
+📘 API Docs available at:
+👉 **[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)**
 
 ---
 
-## 📡 Example API Response
+## 📡 API Endpoints
+
+### 🔹 Health Check
+
+```
+GET /
+```
+
+**Response**
+
+```json
+{ "status": "running" }
+```
+
+---
+
+### 🔹 Generate Quiz from Article
+
+```
+POST /generate_quiz
+```
+
+**Request Body**
 
 ```json
 {
-  "title": "Understanding Artificial Intelligence",
-  "content": [
-    "Artificial intelligence refers to...",
-    "Machine learning is a subset of AI..."
-  ],
-  "quiz": [
+  "url": "https://example.com/article"
+}
+```
+
+---
+
+### ✅ Successful Response
+
+```json
+{
+  "title": "Article Title Here",
+  "questions": [
     {
-      "question": "What is artificial intelligence?",
-      "options": ["...", "...", "...", "..."],
-      "correct_answer": "..."
+      "question": "What is the main idea of the article?",
+      "options": [
+        "Option A",
+        "Option B",
+        "Option C",
+        "Option D"
+      ],
+      "correct_answer": "Option B",
+      "hint": "Focus on the core argument discussed."
     }
   ]
 }
 ```
+
+* Always returns **10 questions**
+* Each question has **4 options**
+* Includes a **hint** for better UX
 
 ---
 
@@ -115,7 +172,8 @@ Open API docs at:
 
 * Quiz-based learning platforms
 * EdTech applications
-* News & content engagement tools
+* Article-to-quiz SaaS products
+* News engagement tools
 * Interview preparation systems
 * Knowledge assessment engines
 
@@ -123,24 +181,31 @@ Open API docs at:
 
 ## 🔐 Ethical Use & Scraping
 
-Quizentia is designed to work only with **publicly accessible content**.
-Users are responsible for complying with website terms of service and applicable laws.
+Quizentia only supports **publicly accessible content**.
+
+Users are responsible for:
+
+* Respecting website terms of service
+* Complying with copyright laws
+* Using generated quizzes ethically
 
 ---
 
 ## 🛣️ Roadmap
 
-* [ ] Multi-article batch processing
 * [ ] Difficulty-based quiz generation
-* [ ] User analytics & scoring
-* [ ] Caching & rate limiting
-* [ ] Multi-language support
+* [ ] Multi-article batch processing
+* [ ] Async & streaming quiz generation
+* [ ] Rate limiting & API keys
+* [ ] Caching for repeated URLs
+* [ ] Multi-language quiz support
+* [ ] Analytics & scoring APIs
 
 ---
 
-## ⭐️ Support
+## ⭐ Support
 
-If you find Quizentia useful, consider giving it a ⭐️ on GitHub.
+If you find **Quizentia** useful, consider giving it a ⭐️ on GitHub — it really helps!
 
----
 
+Just say the word 🚀
