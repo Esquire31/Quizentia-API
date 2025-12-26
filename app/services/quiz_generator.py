@@ -12,9 +12,24 @@ Generate EXACTLY 10 multiple-choice questions.
 Rules:
 - Each question must have 4 options
 - Only one correct answer
+- Jumble the options so the correct answer is not always in the same position. Make it unpredictable.
 - Provide a short helpful hint
 - Questions must be factual and based only on the article
 - Output MUST be valid JSON
+{
+  "questions": [
+    {
+      "question": "string",
+      "options": ["A", "B", "C", "D"],
+      "correct_answer": "one of the options",
+      "hint": "string"
+    }
+  ]
+}
+
+- DO NOT use the word "answer".
+- DO NOT add explanations.
+- DO NOT wrap in markdown.
 - DO NOT include explanations or markdown
 - DO NOT reference the article in anyway in the question, just mention in the recent case of xyz case or in the judgement of xyz case
 """
