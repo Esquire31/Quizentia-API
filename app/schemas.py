@@ -2,6 +2,10 @@ from pydantic import BaseModel
 from typing import List
 
 
+class QuizRequest(BaseModel):
+    url: str
+
+
 class QuizQuestion(BaseModel):
     question: str
     options: List[str]
