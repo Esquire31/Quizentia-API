@@ -16,3 +16,12 @@ class QuizQuestion(BaseModel):
 class QuizResponse(BaseModel):
     title: str
     questions: List[QuizQuestion]
+    
+
+class QuizDefinitionResponse(BaseModel):
+    id: int
+    quiz_id: int
+    title: str
+
+    class Config:
+        from_attributes = True

@@ -206,3 +206,11 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# SQLAlchemy cache
+sqlalchemy_cache/
+alembic/versions/
+alembic.ini
+alembic/env.py
+alembic/script.py.mako
+alembic/README
