@@ -15,8 +15,11 @@ Rules:
 - Jumble the options so the correct answer is not always in the same position. Make it unpredictable.
 - Provide a short helpful hint
 - Questions must be factual and based only on the article
+- Generate an interesting quiz title based on article content
+- Output must be in JSON format as specified below
 - Output MUST be valid JSON
 {
+  "title": "string",
   "questions": [
     {
       "question": "string",
