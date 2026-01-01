@@ -18,4 +18,5 @@ class QuizDefinition(Base):
     id = Column(Integer, primary_key=True, index=True)
     quiz_id = Column(Integer, ForeignKey("quizzes.id"), nullable=False)
     title = Column(String, index=True)
+    week_id = Column(String, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
