@@ -209,8 +209,7 @@ __marimo__/
 
 # SQLAlchemy cache
 sqlalchemy_cache/
-alembic/versions/
-alembic.ini
-alembic/env.py
-alembic/script.py.mako
-alembic/README
+
+# Application logs
+logs/
+*.log

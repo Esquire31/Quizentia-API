@@ -7,12 +7,11 @@ from app.services.listing_scraper import get_latest_article_urls
 from app.schemas import QuizDefinitionResponse, QuizRequest, QuizResponse, WeeklyQuizGroup, GetQuizRequest
 from app.database import get_db
 from app.models import Quiz, QuizDefinition
+from app.logging_config import get_logger
 import json
-import logging
 from typing import List
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 

@@ -6,3 +6,7 @@ lxml
 python-dotenv
 openai
 sqlalchemy
+pymysql
+cryptography
+alembic
+pydantic-settings
