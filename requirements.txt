@@ -10,3 +10,4 @@ pymysql
 cryptography
 alembic
 pydantic-settings
+gunicorn
