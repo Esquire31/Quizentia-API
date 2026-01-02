@@ -46,7 +46,6 @@ jobs:
             mkdir -p logs
             
             # Restart the process in PM2 with gunicorn for production
-            pm2 restart quiz-api || pm2 start "./venv/bin/gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000" --name quiz-api
-            
+            pm2 restart quiz-api || pm2 start "/var/www/quiz_api/venv/bin/gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app -b 0.0.0.0:8000" --name quiz-api
             # Cleanup temp directory
             rm -rf /var/www/quiz_api_temp
