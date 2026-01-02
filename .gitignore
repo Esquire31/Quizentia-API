@@ -213,3 +213,5 @@ sqlalchemy_cache/
 # Application logs
 logs/
 *.log
+
+*.db

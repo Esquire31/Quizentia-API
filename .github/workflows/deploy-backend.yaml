@@ -1,0 +1,52 @@
+name: Deploy FastAPI Backend
+on:
+  push:
+    branches: [ Dreamlaw/release ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy to Server via SCP
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "./*"
+          target: "/var/www/quiz_api_temp"
+          rm: true
+
+      - name: Update and Restart API
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Sync files from temp to production folder
+            rsync -avz --exclude='.env' --exclude='logs/' --exclude='venv/' --exclude='__pycache__/' /var/www/quiz_api_temp/ /var/www/quiz_api/
+            cd /var/www/quiz_api
+            
+            # Create virtual environment if it doesn't exist
+            if [ ! -d "venv" ]; then
+              python3 -m venv venv
+            fi
+            
+            # Update dependencies in the virtual environment
+            ./venv/bin/pip install --upgrade pip
+            ./venv/bin/pip install -r requirements.txt
+            
+            # Run database migrations
+            ./venv/bin/alembic upgrade head
+            
+            # Create logs directory if it doesn't exist
+            mkdir -p logs
+            
+            # Restart the process in PM2 with gunicorn for production
+            pm2 restart quiz-api || pm2 start "./venv/bin/gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000" --name quiz-api
+            
+            # Cleanup temp directory
+            rm -rf /var/www/quiz_api_temp
