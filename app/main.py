@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 import time
 
 from app.router import router
+from app.admin_router import admin_router
 from app.database import engine
 from app import models
 from app.config import settings
@@ -79,6 +80,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(admin_router)
 
 @app.on_event("startup")
 async def startup_event():

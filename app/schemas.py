@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 
 class QuizRequest(BaseModel):
@@ -32,9 +32,29 @@ class QuizDefinitionResponse(BaseModel):
 
 class WeeklyQuizGroup(BaseModel):
     week_label: str
+    week_id: str
     quiz_ids: List[int]
     quizzes: List[QuizDefinitionResponse]
 
 
 class GetQuizRequest(BaseModel):
     quiz_ids: List[int] = []
+
+
+# Admin schemas
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AdminLoginResponse(BaseModel):
+    access_token: str
+    token_type: str
+    expires_in: int
+
+
+class AdminQuizUpdateRequest(BaseModel):
+    question: Optional[str] = None
+    options: Optional[List[str]] = None
+    correct_answer: Optional[str] = None
+    hint: Optional[str] = None

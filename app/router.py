@@ -246,6 +246,7 @@ def list_weekly_quizzes(
     return [
         {
             "week_label": bucket["week_label"],
+            "week_id": bucket.get("week_id_sort"),
             "quiz_ids": bucket["quiz_ids"],
             "quizzes": bucket["quizzes"]
         }

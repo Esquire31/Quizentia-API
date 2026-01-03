@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     DB_PASSWORD: str
     DB_NAME: str
     
+    # Admin credentials
+    ADMIN_USERNAME: str
+    ADMIN_PASSWORD: str
+    ADMIN_SECRET_KEY: str
+    
     # Logging settings
     LOG_LEVEL: str = "INFO"
     LOG_TO_FILE: bool = True
