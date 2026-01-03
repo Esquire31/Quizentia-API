@@ -11,3 +11,4 @@ cryptography
 alembic
 pydantic-settings
 gunicorn
+python-jose[cryptography]
