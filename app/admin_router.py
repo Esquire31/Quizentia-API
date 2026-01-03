@@ -320,3 +320,86 @@ def list_all_quizzes(
         "limit": limit,
         "quizzes": quiz_list
     }
+
+
+@admin_router.get("/weeks/{week_id}/quizzes")
+def get_week_quizzes_info(
+    week_id: str,
+    db: Session = Depends(get_db),
+    admin: dict = Depends(verify_admin)
+):
+    """Get all quiz information for a week WITHOUT questions."""
+    logger.info(f"Admin fetching quiz info for week: {week_id}")
+    
+    # Get all quiz definitions for this week
+    quiz_defs = db.query(QuizDefinition).filter(
+        QuizDefinition.week_id == week_id
+    ).all()
+    
+    if not quiz_defs:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No quizzes found for week {week_id}"
+        )
+    
+    # Get quiz information without questions
+    quiz_ids = [qd.quiz_id for qd in quiz_defs]
+    quizzes = db.query(Quiz).filter(Quiz.id.in_(quiz_ids)).all()
+    
+    quiz_list = []
+    for quiz in quizzes:
+        quiz_def = next((qd for qd in quiz_defs if qd.quiz_id == quiz.id), None)
+        questions_count = len(json.loads(quiz.questions))
+        
+        quiz_list.append({
+            "id": quiz.id,
+            "title": quiz.title,
+            "url": quiz.url,
+            "questions_count": questions_count,
+            "week_id": quiz_def.week_id if quiz_def else None,
+            "quiz_definition_id": quiz_def.id if quiz_def else None,
+            "created_at": quiz.created_at
+        })
+    
+    logger.info(f"Retrieved {len(quiz_list)} quizzes for week {week_id}")
+    return {
+        "week_id": week_id,
+        "total_quizzes": len(quiz_list),
+        "quizzes": quiz_list
+    }
+
+
+@admin_router.get("/quizzes/{quiz_id}/questions")
+def get_quiz_questions(
+    quiz_id: int,
+    db: Session = Depends(get_db),
+    admin: dict = Depends(verify_admin)
+):
+    """Get all questions for a specific quiz."""
+    logger.info(f"Admin fetching questions for quiz: {quiz_id}")
+    
+    # Get the quiz
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Quiz {quiz_id} not found"
+        )
+    
+    # Get quiz definition info
+    quiz_def = db.query(QuizDefinition).filter(
+        QuizDefinition.quiz_id == quiz_id
+    ).first()
+    
+    # Parse questions
+    questions = json.loads(quiz.questions)
+    
+    logger.info(f"Retrieved {len(questions)} questions for quiz {quiz_id}")
+    return {
+        "quiz_id": quiz.id,
+        "title": quiz.title,
+        "url": quiz.url,
+        "week_id": quiz_def.week_id if quiz_def else None,
+        "total_questions": len(questions),
+        "questions": questions
+    }
