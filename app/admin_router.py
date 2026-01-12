@@ -1,14 +1,13 @@
-from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
 from app.models import Quiz, QuizDefinition
 from app.schemas import (
-    AdminLoginRequest, AdminLoginResponse, QuizDefinitionResponse,
+    QuizDefinitionResponse,
     QuizQuestion, AdminQuizUpdateRequest
 )
-from app.auth import authenticate_admin, create_access_token, verify_admin
+from app.firebase_auth import require_admin
 from app.logging_config import get_logger
 import json
 from typing import List
@@ -18,35 +17,11 @@ logger = get_logger(__name__)
 admin_router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
-@admin_router.post("/login", response_model=AdminLoginResponse)
-def admin_login(credentials: AdminLoginRequest):
-    """Admin login endpoint."""
-    if not authenticate_admin(credentials.username, credentials.password):
-        logger.warning(f"Failed admin login attempt for username: {credentials.username}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password"
-        )
-    
-    # Create access token
-    access_token = create_access_token(
-        data={"sub": credentials.username, "role": "admin"},
-        expires_delta=timedelta(hours=8)
-    )
-    
-    logger.info(f"Admin {credentials.username} logged in successfully")
-    return AdminLoginResponse(
-        access_token=access_token,
-        token_type="bearer",
-        expires_in=28800  # 8 hours in seconds
-    )
-
-
 @admin_router.get("/weeks/{week_id}/questions")
 def get_all_week_questions(
     week_id: str,
     db: Session = Depends(get_db),
-    admin: dict = Depends(verify_admin)
+    admin: dict = Depends(require_admin)
 ):
     """Get ALL questions for a specific week (no limit for admin)."""
     logger.info(f"Admin fetching all questions for week: {week_id}")
@@ -89,7 +64,7 @@ def get_all_week_questions(
 def get_week_stats(
     week_id: str,
     db: Session = Depends(get_db),
-    admin: dict = Depends(verify_admin)
+    admin: dict = Depends(require_admin)
 ):
     """Get statistics for a specific week."""
     quiz_defs = db.query(QuizDefinition).filter(
@@ -119,7 +94,7 @@ def get_week_stats(
 def delete_quiz(
     quiz_id: int,
     db: Session = Depends(get_db),
-    admin: dict = Depends(verify_admin)
+    admin: dict = Depends(require_admin)
 ):
     """Delete an entire quiz and its definition."""
     # Get the quiz
@@ -177,7 +152,7 @@ def delete_question(
     quiz_id: int,
     question_index: int,
     db: Session = Depends(get_db),
-    admin: dict = Depends(verify_admin)
+    admin: dict = Depends(require_admin)
 ):
     """Delete a specific question from a quiz."""
     # Get the quiz
@@ -246,7 +221,7 @@ def update_question(
     question_index: int,
     update_data: AdminQuizUpdateRequest,
     db: Session = Depends(get_db),
-    admin: dict = Depends(verify_admin)
+    admin: dict = Depends(require_admin)
 ):
     """Update a specific question in a quiz."""
     # Get the quiz
@@ -291,7 +266,7 @@ def list_all_quizzes(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    admin: dict = Depends(verify_admin)
+    admin: dict = Depends(require_admin)
 ):
     """List all quizzes with pagination."""
     total = db.query(func.count(Quiz.id)).scalar()
@@ -326,7 +301,7 @@ def list_all_quizzes(
 def get_week_quizzes_info(
     week_id: str,
     db: Session = Depends(get_db),
-    admin: dict = Depends(verify_admin)
+    admin: dict = Depends(require_admin)
 ):
     """Get all quiz information for a week WITHOUT questions."""
     logger.info(f"Admin fetching quiz info for week: {week_id}")
@@ -373,7 +348,7 @@ def get_week_quizzes_info(
 def get_quiz_questions(
     quiz_id: int,
     db: Session = Depends(get_db),
-    admin: dict = Depends(verify_admin)
+    admin: dict = Depends(require_admin)
 ):
     """Get all questions for a specific quiz."""
     logger.info(f"Admin fetching questions for quiz: {quiz_id}")

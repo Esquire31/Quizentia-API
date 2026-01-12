@@ -13,10 +13,13 @@ class Settings(BaseSettings):
     DB_PASSWORD: str
     DB_NAME: str
     
-    # Admin credentials
+    # Admin credentials (legacy JWT - will be deprecated)
     ADMIN_USERNAME: str
     ADMIN_PASSWORD: str
     ADMIN_SECRET_KEY: str
+    
+    # Firebase Authentication
+    FIREBASE_CREDENTIALS_PATH: str = "firebase-credentials.json"
     
     # Logging settings
     LOG_LEVEL: str = "INFO"
