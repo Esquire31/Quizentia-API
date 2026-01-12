@@ -12,3 +12,4 @@ alembic
 pydantic-settings
 gunicorn
 python-jose[cryptography]
+firebase-admin

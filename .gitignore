@@ -215,3 +215,8 @@ logs/
 *.log
 
 *.db
+
+# Firebase credentials
+firebase-credentials.json
+*-credentials.json
+serviceAccountKey.json

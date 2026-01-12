@@ -30,6 +30,9 @@ jobs:
             rsync -avz --exclude='.env' --exclude='logs/' --exclude='venv/' --exclude='__pycache__/' /var/www/quiz_api_temp/ /var/www/quiz_api/
             cd /var/www/quiz_api
             
+            # Write Firebase credentials from GitHub secret
+            echo '${{ secrets.FIREBASE_CREDENTIALS }}' > firebase-credentials.json
+            
             # Create virtual environment if it doesn't exist
             if [ ! -d "venv" ]; then
               python3 -m venv venv

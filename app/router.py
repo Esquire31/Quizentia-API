@@ -7,6 +7,7 @@ from app.services.listing_scraper import get_latest_article_urls
 from app.schemas import QuizDefinitionResponse, QuizRequest, QuizResponse, WeeklyQuizGroup, GetQuizRequest
 from app.database import get_db
 from app.models import Quiz, QuizDefinition
+from app.firebase_auth import get_current_user
 from app.logging_config import get_logger
 import json
 from typing import List
@@ -39,16 +40,16 @@ def health_check():
     return {"status": "running"}
 
 @router.post("/scrape")
-def scrape(url: str):
-    logger.info(f"Scraping article from URL: {url}")
+def scrape(url: str, user: dict = Depends(get_current_user)):
+    logger.info(f"User {user['uid']} scraping article from URL: {url}")
     article = scrape_article(url)
     logger.info(f"Scraped article: {article.get('title', 'Unknown')}")
     return article
 
 @router.post("/generate_quiz", response_model=QuizResponse)
-def generate_quiz_questions(payload: QuizRequest):
+def generate_quiz_questions(payload: QuizRequest, user: dict = Depends(get_current_user)):
     try:
-        logger.info(f"Generating quiz for URL: {payload.url}")
+        logger.info(f"User {user['uid']} generating quiz for URL: {payload.url}")
         article = scrape_article(payload.url)
 
         if not article["full_text"]:
@@ -79,9 +80,9 @@ def generate_quiz_questions(payload: QuizRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/listing_scrape")
-def scrape_urls():
+def scrape_urls(user: dict = Depends(get_current_user)):
     try:
-        logger.info("Scraping latest article URLs")
+        logger.info(f"User {user['uid']} scraping latest article URLs")
         
         urls = get_latest_article_urls()
         
@@ -200,9 +201,11 @@ def weekly_ingestion(db: Session = Depends(get_db)):
 @router.get("/quizzes/list", response_model=List[QuizDefinitionResponse])
 def list_quizzes(
     db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000)
 ):
+    logger.info(f"User {user['uid']} listing quizzes")
     quizzes = db.query(QuizDefinition).offset(skip).limit(limit).all()
     return quizzes
 
@@ -210,8 +213,10 @@ def list_quizzes(
 @router.get("/quizzes/weekly", response_model=List[WeeklyQuizGroup])
 def list_weekly_quizzes(
     db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
     max_weeks: int = Query(6, ge=1, le=52)
 ):
+    logger.info(f"User {user['uid']} listing weekly quizzes")
     quiz_definitions = db.query(QuizDefinition).order_by(QuizDefinition.created_at.desc()).all()
     if not quiz_definitions:
         return []
@@ -257,13 +262,14 @@ def list_weekly_quizzes(
 @router.post("/quizzes/get", response_model=QuizResponse)
 def get_quiz(
     payload: GetQuizRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user)
 ):
     try:
         ids_to_fetch = payload.quiz_ids
 
         if ids_to_fetch:
-            logger.info(f"Fetching quizzes with IDs: {ids_to_fetch}")
+            logger.info(f"User {user['uid']} fetching quizzes with IDs: {ids_to_fetch}")
 
             quizzes = db.query(Quiz).filter(Quiz.id.in_(ids_to_fetch)).all()
             if not quizzes:

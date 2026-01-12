@@ -9,6 +9,7 @@ from app.database import engine
 from app import models
 from app.config import settings
 from app.logging_config import setup_logging, get_logger
+from app.firebase_auth import initialize_firebase
 
 # Setup logging before anything else
 setup_logging(
@@ -22,7 +23,7 @@ logger = get_logger(__name__)
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="Quizentia",
+    title="Dreamlaw Quiz API",
     description="Quiz generation API",
     version="1.0.0"
 )
@@ -85,6 +86,15 @@ app.include_router(admin_router)
 @app.on_event("startup")
 async def startup_event():
     logger.info(f"Starting Quizentia API in {settings.ENVIRONMENT} mode")
+    
+    # Initialize Firebase Admin SDK
+    try:
+        initialize_firebase()
+        logger.info("Firebase authentication initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize Firebase: {str(e)}")
+        # Continue running even if Firebase fails - allows for graceful degradation
+        logger.warning("API started without Firebase authentication")
 
 @app.on_event("shutdown")
 async def shutdown_event():
