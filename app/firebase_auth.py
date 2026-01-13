@@ -41,7 +41,7 @@ def initialize_firebase():
         raise RuntimeError(f"Firebase initialization failed: {str(e)}")
 
 
-async def verify_firebase_token(
+def verify_firebase_token(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> dict:
     """
@@ -60,33 +60,34 @@ async def verify_firebase_token(
         token = credentials.credentials
         decoded_token = auth.verify_id_token(token)
         
-        logger.debug(f"Token verified for user: {decoded_token.get('uid')}")
+        logger.info(f"Token verified for user: {decoded_token.get('uid')} (email: {decoded_token.get('email')})")
+        logger.info(f"Token claims: admin={decoded_token.get('admin')}, name={decoded_token.get('name')}")
         return decoded_token
         
-    except auth.InvalidIdTokenError:
-        logger.warning("Invalid Firebase ID token provided")
+    except auth.InvalidIdTokenError as e:
+        logger.warning(f"Invalid Firebase ID token provided: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except auth.ExpiredIdTokenError:
-        logger.warning("Expired Firebase ID token provided")
+    except auth.ExpiredIdTokenError as e:
+        logger.warning(f"Expired Firebase ID token provided: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication token has expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
     except Exception as e:
-        logger.error(f"Token verification failed: {str(e)}")
+        logger.error(f"Token verification failed: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed",
+            detail=f"Authentication failed: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
 
-async def get_current_user(token_data: dict = Depends(verify_firebase_token)) -> dict:
+def get_current_user(token_data: dict = Depends(verify_firebase_token)) -> dict:
     """
     Get current authenticated user information from Firebase token.
     
@@ -104,7 +105,7 @@ async def get_current_user(token_data: dict = Depends(verify_firebase_token)) ->
     }
 
 
-async def require_admin(token_data: dict = Depends(verify_firebase_token)) -> dict:
+def require_admin(token_data: dict = Depends(verify_firebase_token)) -> dict:
     """
     Verify that the authenticated user has admin privileges.
     
