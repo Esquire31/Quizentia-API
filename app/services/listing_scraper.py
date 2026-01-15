@@ -10,7 +10,7 @@ BASE_URL = "https://www.livelaw.in"
 LISTING_URL = f"{BASE_URL}/articles"
 
 
-def get_latest_article_urls(limit: int = 12) -> list[str]:
+def get_latest_article_urls(limit: int = 20) -> list[str]:
     response = requests.get(LISTING_URL, headers=HEADERS, timeout=10)
     response.raise_for_status()
 

@@ -24,6 +24,7 @@ class QuizDefinitionResponse(BaseModel):
     quiz_id: int
     title: str
     week_id: str
+    selected_questions: Optional[List[int]] = None
     created_at: datetime
 
     class Config:
@@ -58,3 +59,21 @@ class AdminQuizUpdateRequest(BaseModel):
     options: Optional[List[str]] = None
     correct_answer: Optional[str] = None
     hint: Optional[str] = None
+
+
+class QuestionSelectionUpdate(BaseModel):
+    """Update question selection for a quiz in a week."""
+    quiz_definition_id: int
+    selected_indices: List[int]
+
+
+class BulkQuestionSelectionUpdate(BaseModel):
+    """Update question selections for multiple quizzes in a week."""
+    selections: List[QuestionSelectionUpdate]
+
+
+class WeeklyQuestionsResponse(BaseModel):
+    """Response for weekly questions."""
+    week_id: str
+    total_questions: int
+    questions: List[dict]
