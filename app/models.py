@@ -50,6 +50,25 @@ class WeekSummary(Base):
     last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class UserQuizResult(Base):
+    """Stores user quiz results for each week. Best result per week is kept."""
+    __tablename__ = "user_quiz_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String(255), index=True, nullable=False)  # Firebase UID
+    week_id = Column(String(100), index=True, nullable=False)
+    score = Column(Integer, nullable=False)  # Number of correct answers
+    total_questions = Column(Integer, nullable=False)  # Total questions in the quiz
+    answers = Column(Text, nullable=False)  # JSON: [{question_index, quiz_id, selected_answer, is_correct}, ...]
+    attempt_number = Column(Integer, nullable=False, default=1)
+    is_best = Column(Boolean, nullable=False, default=True)  # True if this is the best result for this week
+    completed_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    __table_args__ = (
+        UniqueConstraint('user_id', 'week_id', 'attempt_number', name='uq_user_week_attempt'),
+    )
+
+
 # Legacy model - to be deprecated after migration
 class QuizDefinition(Base):
     __tablename__ = "quiz_definition"
