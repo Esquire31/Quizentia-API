@@ -77,3 +77,51 @@ class WeeklyQuestionsResponse(BaseModel):
     week_id: str
     total_questions: int
     questions: List[dict]
+
+
+# User quiz result schemas
+class QuizAnswerSubmit(BaseModel):
+    """Single answer submitted by user."""
+    quiz_id: int
+    question_index: int
+    selected_answer: str
+
+
+class QuizResultSubmit(BaseModel):
+    """User's quiz result submission."""
+    week_id: str
+    answers: List[QuizAnswerSubmit]
+
+
+class QuizResultResponse(BaseModel):
+    """Response after submitting quiz results."""
+    id: int
+    user_id: str
+    week_id: str
+    score: int
+    total_questions: int
+    percentage: float
+    attempt_number: int
+    is_best: bool
+    is_new_best: bool  # True if this attempt is better than previous best
+    completed_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class UserWeekResultSummary(BaseModel):
+    """Summary of user's results for a specific week."""
+    week_id: str
+    best_score: int
+    best_percentage: float
+    total_attempts: int
+    last_attempt_at: datetime
+    best_attempt_number: int
+
+
+class UserResultHistory(BaseModel):
+    """User's quiz result history."""
+    user_id: str
+    total_weeks_attempted: int
+    results_by_week: List[UserWeekResultSummary]

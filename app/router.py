@@ -1,12 +1,16 @@
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func, desc
 from app.scraper import scrape_article
 from app.services.quiz_generator import generate_quiz
 from app.services.listing_scraper import get_latest_article_urls
-from app.schemas import QuizDefinitionResponse, QuizRequest, QuizResponse, WeeklyQuizGroup, GetQuizRequest
+from app.schemas import (
+    QuizDefinitionResponse, QuizRequest, QuizResponse, WeeklyQuizGroup, GetQuizRequest,
+    QuizResultSubmit, QuizResultResponse, UserWeekResultSummary, UserResultHistory
+)
 from app.database import get_db
-from app.models import Quiz, WeekQuestions, BackupQuestions, WeekSummary
+from app.models import Quiz, WeekQuestions, BackupQuestions, WeekSummary, UserQuizResult
 from app.firebase_auth import get_current_user
 from app.logging_config import get_logger
 from app.ingestion_helpers import update_week_summary, fill_week_to_target
@@ -504,3 +508,231 @@ def get_quiz(
     except Exception as e:
         logger.error(f"Error fetching quiz: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/quizzes/results", response_model=QuizResultResponse)
+def submit_quiz_result(
+    result: QuizResultSubmit,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    """Submit quiz results for a week. Keeps track of attempts and best score."""
+    user_id = user['uid']
+    week_id = result.week_id
+    
+    logger.info(f"User {user_id} submitting results for week {week_id}")
+    
+    # Validate week exists
+    week_summary = db.query(WeekSummary).filter(WeekSummary.week_id == week_id).first()
+    if not week_summary:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Week {week_id} not found"
+        )
+    
+    # Get all WeekQuestions for this week to validate answers
+    week_questions = db.query(WeekQuestions).filter(
+        WeekQuestions.week_id == week_id
+    ).all()
+    
+    if not week_questions:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No questions found for week {week_id}"
+        )
+    
+    # Build quiz map for validation
+    quiz_ids = [wq.quiz_id for wq in week_questions]
+    quizzes = db.query(Quiz).filter(Quiz.id.in_(quiz_ids)).all()
+    quiz_map = {q.id: json.loads(q.questions) for q in quizzes}
+    
+    # Calculate score and validate answers
+    correct_count = 0
+    validated_answers = []
+    
+    for answer in result.answers:
+        if answer.quiz_id not in quiz_map:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Quiz {answer.quiz_id} not found in week {week_id}"
+            )
+        
+        questions = quiz_map[answer.quiz_id]
+        if answer.question_index < 0 or answer.question_index >= len(questions):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid question index {answer.question_index} for quiz {answer.quiz_id}"
+            )
+        
+        question = questions[answer.question_index]
+        is_correct = answer.selected_answer == question['correct_answer']
+        
+        if is_correct:
+            correct_count += 1
+        
+        validated_answers.append({
+            'quiz_id': answer.quiz_id,
+            'question_index': answer.question_index,
+            'selected_answer': answer.selected_answer,
+            'is_correct': is_correct
+        })
+    
+    total_questions = len(result.answers)
+    percentage = (correct_count / total_questions * 100) if total_questions > 0 else 0
+    
+    # Get current attempt count for this user/week
+    existing_attempts = db.query(UserQuizResult).filter(
+        UserQuizResult.user_id == user_id,
+        UserQuizResult.week_id == week_id
+    ).count()
+    
+    attempt_number = existing_attempts + 1
+    
+    # Get current best score
+    best_result = db.query(UserQuizResult).filter(
+        UserQuizResult.user_id == user_id,
+        UserQuizResult.week_id == week_id,
+        UserQuizResult.is_best == True
+    ).first()
+    
+    is_new_best = False
+    is_best = False
+    
+    if best_result is None:
+        # First attempt is always the best
+        is_best = True
+        is_new_best = True
+    elif correct_count > best_result.score:
+        # New best score
+        is_best = True
+        is_new_best = True
+        # Mark previous best as not best
+        best_result.is_best = False
+    
+    # Create new result
+    new_result = UserQuizResult(
+        user_id=user_id,
+        week_id=week_id,
+        score=correct_count,
+        total_questions=total_questions,
+        answers=json.dumps(validated_answers),
+        attempt_number=attempt_number,
+        is_best=is_best
+    )
+    
+    db.add(new_result)
+    db.commit()
+    db.refresh(new_result)
+    
+    logger.info(f"User {user_id} completed week {week_id}: {correct_count}/{total_questions} (attempt #{attempt_number}, best: {is_best})")
+    
+    return QuizResultResponse(
+        id=new_result.id,
+        user_id=new_result.user_id,
+        week_id=new_result.week_id,
+        score=new_result.score,
+        total_questions=new_result.total_questions,
+        percentage=percentage,
+        attempt_number=new_result.attempt_number,
+        is_best=new_result.is_best,
+        is_new_best=is_new_best,
+        completed_at=new_result.completed_at
+    )
+
+
+@router.get("/users/results/history", response_model=UserResultHistory)
+def get_user_result_history(
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    """Get user's quiz result history across all weeks."""
+    user_id = user['uid']
+    
+    logger.info(f"Fetching result history for user {user_id}")
+    
+    # Get all results for this user grouped by week
+    results = db.query(UserQuizResult).filter(
+        UserQuizResult.user_id == user_id
+    ).all()
+    
+    if not results:
+        return UserResultHistory(
+            user_id=user_id,
+            total_weeks_attempted=0,
+            results_by_week=[]
+        )
+    
+    # Group by week
+    weeks = {}
+    for result in results:
+        week_id = result.week_id
+        if week_id not in weeks:
+            weeks[week_id] = []
+        weeks[week_id].append(result)
+    
+    # Build summary for each week
+    results_by_week = []
+    for week_id, week_results in weeks.items():
+        best_result = next((r for r in week_results if r.is_best), week_results[0])
+        last_attempt = max(week_results, key=lambda r: r.completed_at)
+        
+        best_percentage = (best_result.score / best_result.total_questions * 100) if best_result.total_questions > 0 else 0
+        
+        results_by_week.append(UserWeekResultSummary(
+            week_id=week_id,
+            best_score=best_result.score,
+            best_percentage=best_percentage,
+            total_attempts=len(week_results),
+            last_attempt_at=last_attempt.completed_at,
+            best_attempt_number=best_result.attempt_number
+        ))
+    
+    # Sort by week_id descending (most recent first)
+    results_by_week.sort(key=lambda x: x.week_id, reverse=True)
+    
+    return UserResultHistory(
+        user_id=user_id,
+        total_weeks_attempted=len(weeks),
+        results_by_week=results_by_week
+    )
+
+
+@router.get("/users/results/week/{week_id}")
+def get_user_week_result(
+    week_id: str,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    """Get user's results for a specific week including all attempts."""
+    user_id = user['uid']
+    
+    logger.info(f"Fetching week {week_id} results for user {user_id}")
+    
+    results = db.query(UserQuizResult).filter(
+        UserQuizResult.user_id == user_id,
+        UserQuizResult.week_id == week_id
+    ).order_by(desc(UserQuizResult.attempt_number)).all()
+    
+    if not results:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No results found for week {week_id}"
+        )
+    
+    return {
+        "week_id": week_id,
+        "total_attempts": len(results),
+        "attempts": [
+            {
+                "id": r.id,
+                "attempt_number": r.attempt_number,
+                "score": r.score,
+                "total_questions": r.total_questions,
+                "percentage": (r.score / r.total_questions * 100) if r.total_questions > 0 else 0,
+                "is_best": r.is_best,
+                "completed_at": r.completed_at,
+                "answers": json.loads(r.answers)
+            }
+            for r in results
+        ]
+    }
