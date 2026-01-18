@@ -123,10 +123,17 @@ def weekly_ingestion(db: Session = Depends(get_db)):
         for i, url in enumerate(urls[:20]):
             logger.info(f"Processing article {i+1}/20: {url}")
             
-            # Check if URL already ingested
+            # Check if URL already ingested - reuse existing quiz
             existing_quiz = db.query(Quiz).filter(Quiz.url == url).first()
             if existing_quiz:
-                logger.info(f"Article already ingested, skipping URL: {url}")
+                logger.info(f"Article already ingested, reusing quiz ID {existing_quiz.id}: {url}")
+                questions_data = json.loads(existing_quiz.questions)
+                valid_quizzes.append({
+                    'title': existing_quiz.title,
+                    'url': existing_quiz.url,
+                    'questions': questions_data,
+                    'existing_quiz_id': existing_quiz.id  # Mark as existing
+                })
                 continue
             
             try:
@@ -183,24 +190,32 @@ def weekly_ingestion(db: Session = Depends(get_db)):
         total_questions_available = 0
         
         for quiz_data in week_quizzes:
-            # Create Quiz entry
-            quiz_entry = Quiz(
-                title=quiz_data['title'],
-                url=quiz_data['url'],
-                questions=json.dumps(quiz_data['questions'])
-            )
-            db.add(quiz_entry)
-            db.flush()  # Get the ID
+            # Check if this is an existing quiz or new one
+            if 'existing_quiz_id' in quiz_data:
+                # Reuse existing quiz
+                quiz_id = quiz_data['existing_quiz_id']
+                logger.info(f"Reusing existing quiz ID {quiz_id} with {len(quiz_data['questions'])} questions")
+            else:
+                # Create new Quiz entry
+                quiz_entry = Quiz(
+                    title=quiz_data['title'],
+                    url=quiz_data['url'],
+                    questions=json.dumps(quiz_data['questions'])
+                )
+                db.add(quiz_entry)
+                db.flush()  # Get the ID
+                quiz_id = quiz_entry.id
+                logger.info(f"Saved new quiz ID {quiz_id} with {len(quiz_data['questions'])} questions")
             
-            saved_quiz_ids.append(quiz_entry.id)
+            saved_quiz_ids.append(quiz_id)
             total_questions_available += len(quiz_data['questions'])
-            logger.info(f"Saved quiz ID {quiz_entry.id} with {len(quiz_data['questions'])} questions")
         
         logger.info(f"Total questions available from {len(week_quizzes)} quizzes: {total_questions_available}")
         
         # Distribute 100 questions sequentially across quizzes
         questions_to_select = min(100, total_questions_available)
         remaining_to_select = questions_to_select
+        added_quiz_ids = []  # Track in memory
         
         for quiz_id in saved_quiz_ids:
             quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
@@ -222,6 +237,7 @@ def weekly_ingestion(db: Session = Depends(get_db)):
                 created_at=quiz.created_at
             )
             db.add(week_q)
+            added_quiz_ids.append(quiz_id)  # Track in memory
             
             remaining_to_select -= to_select
             logger.info(f"Quiz {quiz_id}: {to_select} selected, {len(unselected_indices)} unselected")
@@ -231,12 +247,6 @@ def weekly_ingestion(db: Session = Depends(get_db)):
         
         # If we still have quizzes that weren't touched (all their questions are unselected)
         if remaining_to_select <= 0:
-            # Find quizzes that weren't added yet
-            added_quiz_ids = db.query(WeekQuestions.quiz_id).filter(
-                WeekQuestions.week_id == week_id
-            ).all()
-            added_quiz_ids = [q[0] for q in added_quiz_ids]
-            
             for quiz_id in saved_quiz_ids:
                 if quiz_id not in added_quiz_ids:
                     quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
@@ -252,27 +262,36 @@ def weekly_ingestion(db: Session = Depends(get_db)):
                         created_at=quiz.created_at
                     )
                     db.add(week_q)
+                    added_quiz_ids.append(quiz_id)  # Track in memory
                     logger.info(f"Quiz {quiz_id}: 0 selected, {total_q} unselected")
         
         # Save backup quizzes (articles 13+)
         for quiz_data in backup_quizzes:
-            # Create Quiz entry
-            quiz_entry = Quiz(
-                title=quiz_data['title'],
-                url=quiz_data['url'],
-                questions=json.dumps(quiz_data['questions'])
-            )
-            db.add(quiz_entry)
-            db.flush()
+            # Check if this is an existing quiz or new one
+            if 'existing_quiz_id' in quiz_data:
+                # Reuse existing quiz
+                quiz_id = quiz_data['existing_quiz_id']
+                logger.info(f"Reusing existing quiz ID {quiz_id} for backup")
+            else:
+                # Create new Quiz entry
+                quiz_entry = Quiz(
+                    title=quiz_data['title'],
+                    url=quiz_data['url'],
+                    questions=json.dumps(quiz_data['questions'])
+                )
+                db.add(quiz_entry)
+                db.flush()
+                quiz_id = quiz_entry.id
+                logger.info(f"Saved new quiz ID {quiz_id} for backup")
             
             # Add all questions to backup
             all_indices = list(range(len(quiz_data['questions'])))
             backup_entry = BackupQuestions(
-                quiz_id=quiz_entry.id,
+                quiz_id=quiz_id,
                 question_indices=json.dumps(all_indices)
             )
             db.add(backup_entry)
-            logger.info(f"Added quiz {quiz_entry.id} to backup with {len(all_indices)} questions")
+            logger.info(f"Added quiz {quiz_id} to backup with {len(all_indices)} questions")
         
         db.commit()
         

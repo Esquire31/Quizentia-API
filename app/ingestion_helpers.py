@@ -289,21 +289,37 @@ def fill_week_to_target(db: Session, week_id: str, target_selected: int = 100) -
             selected_indices = indices[:questions_to_take]
             unselected_indices = indices[questions_to_take:]
             
-            # Get quiz to use its created_at
-            quiz = db.query(Quiz).filter(Quiz.id == cq['quiz_id']).first()
+            # Check if this quiz already exists in the week
+            existing_wq = db.query(WeekQuestions).filter(
+                WeekQuestions.week_id == week_id,
+                WeekQuestions.quiz_id == cq['quiz_id']
+            ).first()
             
-            # Create WeekQuestions entry
-            week_q = WeekQuestions(
-                week_id=week_id,
-                quiz_id=cq['quiz_id'],
-                selected_indices=json.dumps(selected_indices),
-                unselected_indices=json.dumps(unselected_indices),
-                created_at=quiz.created_at if quiz else None
-            )
-            db.add(week_q)
+            if existing_wq:
+                # Add to existing entry
+                existing_selected = json.loads(existing_wq.selected_indices)
+                existing_selected.extend(selected_indices)
+                existing_wq.selected_indices = json.dumps(existing_selected)
+                
+                existing_unselected = json.loads(existing_wq.unselected_indices)
+                existing_unselected.extend(unselected_indices)
+                existing_wq.unselected_indices = json.dumps(existing_unselected)
+            else:
+                # Get quiz to use its created_at
+                quiz = db.query(Quiz).filter(Quiz.id == cq['quiz_id']).first()
+                
+                # Create WeekQuestions entry
+                week_q = WeekQuestions(
+                    week_id=week_id,
+                    quiz_id=cq['quiz_id'],
+                    selected_indices=json.dumps(selected_indices),
+                    unselected_indices=json.dumps(unselected_indices),
+                    created_at=quiz.created_at if quiz else None
+                )
+                db.add(week_q)
+                quizzes_added += 1
             
             questions_added += len(selected_indices)
-            quizzes_added += 1
             
             # Delete or update backup
             if not unselected_indices:
